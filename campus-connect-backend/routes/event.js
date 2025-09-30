@@ -57,15 +57,42 @@ router.post('/events', async (req, res, next) => {
   }
 });
 
-// GET /api/events (List all events)
+// GET /api/events (List all events with optional category filter)
 router.get('/events', async (req, res, next) => {
   try {
-    const events = await Event.find()
+    const { category } = req.query;
+    const filter = category ? { category } : {};
+
+    const events = await Event.find(filter)
       .populate('createdBy', 'fullName email')
       .exec();
     res.status(200).json(events);
   } catch (err) {
     console.error('Error fetching events:', err);
+    next(err);
+  }
+});
+
+// GET /api/events/:id (Get single event by ID)
+router.get('/events/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid event ID' });
+    }
+
+    const event = await Event.findById(id)
+      .populate('createdBy', 'fullName email')
+      .exec();
+
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    res.status(200).json(event);
+  } catch (err) {
+    console.error('Error fetching event:', err);
     next(err);
   }
 });
