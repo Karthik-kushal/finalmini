@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const router = express.Router();
 const Event = require('../models/Event');
 const User = require('../models/User');
+const { sendNewEventNotification } = require('../services/emailService');
 
 // POST /api/events (Create an event)
 router.post('/events', async (req, res, next) => {
@@ -35,21 +36,41 @@ router.post('/events', async (req, res, next) => {
       return res.status(404).json({ message: 'User not found for createdBy field.' });
     }
 
-    const event = new Event({ 
-      title, 
-      description, 
-      detailedDescription, 
-      date, 
-      location, 
-      imageUrl, 
-      createdBy, 
-      category, 
-      tags 
+    const event = new Event({
+      title,
+      description,
+      detailedDescription,
+      date,
+      location,
+      imageUrl,
+      createdBy,
+      category,
+      tags
     });
 
     await event.save();
 
-    res.status(201).json(event);
+    const populatedEvent = await Event.findById(event._id)
+      .populate('createdBy', 'fullName email')
+      .exec();
+
+    setImmediate(async () => {
+      try {
+        const students = await User.find({ role: 'student' }).select('email fullName');
+
+        if (students && students.length > 0) {
+          console.log(`📧 Sending event notifications to ${students.length} students...`);
+          const emailResult = await sendNewEventNotification(populatedEvent, students);
+          console.log(`📧 Email notification result:`, emailResult);
+        } else {
+          console.log('ℹ️ No students found to notify.');
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending email notifications:', emailError);
+      }
+    });
+
+    res.status(201).json(populatedEvent);
 
   } catch (err) {
     console.error('Error creating event:', err);

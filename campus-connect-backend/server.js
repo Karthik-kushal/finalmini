@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
+const { verifyEmailConfiguration } = require('./services/emailService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,6 +20,11 @@ app.use('/api', authRoutes);
 app.use('/api', eventRoutes);
 app.use('/api', rsvpRoutes);
 
+app.get('/api/test-email-config', async (req, res) => {
+  const result = await verifyEmailConfiguration();
+  res.json(result);
+});
+
 
 
 // MongoDB connection
@@ -31,7 +37,14 @@ mongoose.connect(process.env.MONGO_URI, {
   console.error('❌ MongoDB connection error:', err.message);
 });
 
-// Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+
+  const emailConfig = await verifyEmailConfiguration();
+  if (emailConfig.configured) {
+    console.log('✅ Email service configured and ready');
+  } else {
+    console.log('⚠️ Email service not configured:', emailConfig.message);
+    console.log('💡 Add EMAIL_USER and EMAIL_PASSWORD to .env file to enable notifications');
+  }
 });
